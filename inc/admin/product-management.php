@@ -1,4 +1,4 @@
-// inc/admin/product-management.php
+<?php
 class RhuarcsProductManagement {
     public function __construct() {
         add_action('wp_ajax_rhuarcs_get_products', array($this, 'get_products'));
@@ -23,7 +23,7 @@ class RhuarcsProductManagement {
         foreach ($products as $product) {
             $formatted_products[] = array(
                 'id' => $product->ID,
-                'name' => $product->post_title,
+                'title' => $product->post_title,
                 'description' => $product->post_content,
                 'price' => get_post_meta($product->ID, '_price', true),
                 'stock' => get_post_meta($product->ID, '_stock', true),
@@ -37,12 +37,12 @@ class RhuarcsProductManagement {
 
     public function add_product() {
         check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
-        
-        if (!current_user_can('edit_products')) {
+
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Unauthorized');
         }
 
-        $data = json_decode(file_get_contents('php://input'), true);
+        $data = $_POST;
 
         $product_id = wp_insert_post(array(
             'post_type' => 'products',
@@ -54,7 +54,7 @@ class RhuarcsProductManagement {
         if ($product_id) {
             update_post_meta($product_id, '_price', floatval($data['price']));
             update_post_meta($product_id, '_stock', intval($data['stock']));
-            
+
             if (!empty($data['category'])) {
                 wp_set_object_terms($product_id, $data['category'], 'product_category');
             }
@@ -65,7 +65,51 @@ class RhuarcsProductManagement {
         wp_send_json_error('Failed to create product');
     }
 
-    // Add update_product and delete_product methods similarly
+    public function update_product() {
+        check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Unauthorized');
+        }
+
+        $data = $_POST;
+        $product_id = intval($data['id']);
+
+        $updated = wp_update_post(array(
+            'ID' => $product_id,
+            'post_title' => sanitize_text_field($data['name']),
+            'post_content' => wp_kses_post($data['description'])
+        ));
+
+        if ($updated) {
+            update_post_meta($product_id, '_price', floatval($data['price']));
+            update_post_meta($product_id, '_stock', intval($data['stock']));
+
+            if (!empty($data['category'])) {
+                wp_set_object_terms($product_id, $data['category'], 'product_category');
+            }
+
+            wp_send_json_success(array('id' => $product_id));
+        }
+
+        wp_send_json_error('Failed to update product');
+    }
+
+    public function delete_product() {
+        check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Unauthorized');
+        }
+
+        $product_id = intval($_POST['product_id']);
+
+        if (wp_delete_post($product_id, true)) {
+            wp_send_json_success();
+        }
+
+        wp_send_json_error('Failed to delete product');
+    }
 }
 
 new RhuarcsProductManagement();

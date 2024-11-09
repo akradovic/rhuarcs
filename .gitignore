@@ -1,4 +1,10 @@
-node_modules/
+# Dependencies
+/node_modules
+
+# Build files
+/assets/css/main.css
+/assets/js/admin/build
+
+# Local development
 .DS_Store
-assets/js/admin/build/
-*.log" 
+.env

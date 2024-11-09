@@ -1,28 +1,41 @@
 <?php
-// functions.php
 
-if (!defined('ABSPATH')) exit;
+// Theme Setup
+function rhuarcs_setup() {
+    add_theme_support('title-tag');
+    add_theme_support('custom-logo');
+    add_theme_support('post-thumbnails');
+    add_theme_support('html5', array(
+        'search-form',
+        'comment-form',
+        'comment-list',
+        'gallery',
+        'caption',
+        'style',
+        'script'
+    ));
 
-// Include necessary files
-require_once get_template_directory() . '/inc/custom-post-types.php';
-require_once get_template_directory() . '/inc/admin/product-management.php';
-require_once get_template_directory() . '/inc/helpers.php';
-
-// Enqueue admin scripts
-function rhuarcs_admin_scripts() {
-    if (current_user_can('edit_products')) {
-        wp_enqueue_script('rhuarcs-admin', 
-            get_template_directory_uri() . '/assets/js/admin/build/index.js',
-            array('wp-element'), // WordPress's React
-            '1.0.0',
-            true
-        );
-
-        // Add admin ajax url and nonce to our script
-        wp_localize_script('rhuarcs-admin', 'rhuarcsAdmin', array(
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('rhuarcs_admin_nonce')
-        ));
-    }
+    register_nav_menus(array(
+        'primary' => __('Primary Menu', 'rhuarcs'),
+        'footer' => __('Footer Menu', 'rhuarcs'),
+    ));
 }
-add_action('admin_enqueue_scripts', 'rhuarcs_admin_scripts');
+add_action('after_setup_theme', 'rhuarcs_setup');
+
+// Enqueue Scripts and Styles
+function rhuarcs_scripts() {
+    wp_enqueue_style('rhuarcs-styles', get_stylesheet_uri(), array(), wp_get_theme()->get('Version'));
+    wp_enqueue_style('rhuarcs-main', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.0');
+    wp_enqueue_script('rhuarcs-scripts', get_template_directory_uri() . '/assets/js/scripts.js', array(), '1.0.0', true);
+}
+add_action('wp_enqueue_scripts', 'rhuarcs_scripts');
+
+// Include required files
+require_once get_template_directory() . '/inc/custom-post-types.php';
+require_once get_template_directory() . '/inc/helpers.php';
+require_once get_template_directory() . '/inc/admin/product-management.php';
+
+// Admin page setup
+if (is_admin()) {
+    require_once get_template_directory() . '/inc/admin/admin-page.php';
+}

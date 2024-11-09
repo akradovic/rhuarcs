@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors;
+  }
+  
+  .btn-primary {
+    @apply bg-brand-purple text-white hover:bg-brand-light;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-900 hover:bg-gray-200;
+  }
+  
+  .form-input {
+    @apply w-full rounded-md border-gray-300 shadow-sm focus:border-brand-purple focus:ring-brand-purple;
+  }
+}
