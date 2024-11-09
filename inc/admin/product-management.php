@@ -1,115 +1,95 @@
 <?php
-class RhuarcsProductManagement {
-    public function __construct() {
-        add_action('wp_ajax_rhuarcs_get_products', array($this, 'get_products'));
-        add_action('wp_ajax_rhuarcs_add_product', array($this, 'add_product'));
-        add_action('wp_ajax_rhuarcs_update_product', array($this, 'update_product'));
-        add_action('wp_ajax_rhuarcs_delete_product', array($this, 'delete_product'));
+// inc/custom-post-types.php
+
+function rhuarcs_register_post_types() {
+    register_post_type('product', [
+        'labels' => [
+            'name' => __('Products', 'rhuarcs'),
+            'singular_name' => __('Product', 'rhuarcs')
+        ],
+        'public' => true,
+        'has_archive' => true,
+        'show_in_rest' => true,
+        'supports' => ['title', 'editor', 'thumbnail', 'custom-fields'],
+        'menu_icon' => 'dashicons-cart',
+        'rewrite' => ['slug' => 'products']
+    ]);
+    
+    register_taxonomy('product_category', 'product', [
+        'hierarchical' => true,
+        'labels' => ['name' => 'Categories'],
+        'show_in_rest' => true,
+        'rewrite' => ['slug' => 'product-category']
+    ]);
+    
+    register_taxonomy('pet_type', 'product', [
+        'hierarchical' => true,
+        'labels' => ['name' => 'Pet Types'],
+        'show_in_rest' => true,
+        'rewrite' => ['slug' => 'pet-type']
+    ]);
+}
+add_action('init', 'rhuarcs_register_post_types');
+
+// inc/admin/product-management.php
+function rhuarcs_get_products() {
+    check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
+    
+    $args = [
+        'post_type' => 'product',
+        'posts_per_page' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC'
+    ];
+    
+    $products = [];
+    $query = new WP_Query($args);
+    
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $products[] = [
+                'id' => get_the_ID(),
+                'title' => get_the_title(),
+                'description' => get_the_content(),
+                'price' => get_post_meta(get_the_ID(), '_price', true),
+                'stock' => get_post_meta(get_the_ID(), '_stock', true),
+                'category' => wp_get_post_terms(get_the_ID(), 'product_category', ['fields' => 'names']),
+                'pet_type' => wp_get_post_terms(get_the_ID(), 'pet_type', ['fields' => 'names']),
+                'image' => get_the_post_thumbnail_url(get_the_ID(), 'thumbnail')
+            ];
+        }
     }
+    wp_reset_postdata();
+    
+    wp_send_json_success($products);
+}
+add_action('wp_ajax_rhuarcs_get_products', 'rhuarcs_get_products');
 
-    public function get_products() {
-        check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
-
-        $args = array(
-            'post_type' => 'products',
-            'posts_per_page' => -1,
-            'orderby' => 'title',
-            'order' => 'ASC'
-        );
-
-        $products = get_posts($args);
-        $formatted_products = array();
-
-        foreach ($products as $product) {
-            $formatted_products[] = array(
-                'id' => $product->ID,
-                'title' => $product->post_title,
-                'description' => $product->post_content,
-                'price' => get_post_meta($product->ID, '_price', true),
-                'stock' => get_post_meta($product->ID, '_stock', true),
-                'category' => wp_get_post_terms($product->ID, 'product_category'),
-                'image' => get_the_post_thumbnail_url($product->ID, 'medium')
-            );
-        }
-
-        wp_send_json_success($formatted_products);
+function rhuarcs_add_product() {
+    check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('Insufficient permissions');
+        return;
     }
-
-    public function add_product() {
-        check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
-
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error('Unauthorized');
-        }
-
-        $data = $_POST;
-
-        $product_id = wp_insert_post(array(
-            'post_type' => 'products',
-            'post_title' => sanitize_text_field($data['name']),
-            'post_content' => wp_kses_post($data['description']),
-            'post_status' => 'publish'
-        ));
-
-        if ($product_id) {
-            update_post_meta($product_id, '_price', floatval($data['price']));
-            update_post_meta($product_id, '_stock', intval($data['stock']));
-
-            if (!empty($data['category'])) {
-                wp_set_object_terms($product_id, $data['category'], 'product_category');
-            }
-
-            wp_send_json_success(array('id' => $product_id));
-        }
-
+    
+    $product_data = [
+        'post_title' => sanitize_text_field($_POST['title']),
+        'post_content' => wp_kses_post($_POST['description']),
+        'post_type' => 'product',
+        'post_status' => 'publish'
+    ];
+    
+    $product_id = wp_insert_post($product_data);
+    
+    if ($product_id) {
+        update_post_meta($product_id, '_price', sanitize_text_field($_POST['price']));
+        update_post_meta($product_id, '_stock', sanitize_text_field($_POST['stock']));
+        
+        wp_send_json_success(['id' => $product_id]);
+    } else {
         wp_send_json_error('Failed to create product');
     }
-
-    public function update_product() {
-        check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
-
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error('Unauthorized');
-        }
-
-        $data = $_POST;
-        $product_id = intval($data['id']);
-
-        $updated = wp_update_post(array(
-            'ID' => $product_id,
-            'post_title' => sanitize_text_field($data['name']),
-            'post_content' => wp_kses_post($data['description'])
-        ));
-
-        if ($updated) {
-            update_post_meta($product_id, '_price', floatval($data['price']));
-            update_post_meta($product_id, '_stock', intval($data['stock']));
-
-            if (!empty($data['category'])) {
-                wp_set_object_terms($product_id, $data['category'], 'product_category');
-            }
-
-            wp_send_json_success(array('id' => $product_id));
-        }
-
-        wp_send_json_error('Failed to update product');
-    }
-
-    public function delete_product() {
-        check_ajax_referer('rhuarcs_admin_nonce', 'nonce');
-
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error('Unauthorized');
-        }
-
-        $product_id = intval($_POST['product_id']);
-
-        if (wp_delete_post($product_id, true)) {
-            wp_send_json_success();
-        }
-
-        wp_send_json_error('Failed to delete product');
-    }
 }
-
-new RhuarcsProductManagement();
+add_action('wp_ajax_rhuarcs_add_product', 'rhuarcs_add_product');

@@ -1,11 +1,15 @@
 <?php
+// functions.php additions
+
+if (!defined('ABSPATH')) exit;
 
 // Theme Setup
-function rhuarcs_setup() {
+function rhuarcs_theme_setup() {
+    // Add theme support
     add_theme_support('title-tag');
-    add_theme_support('custom-logo');
     add_theme_support('post-thumbnails');
-    add_theme_support('html5', array(
+    add_theme_support('custom-logo');
+    add_theme_support('html5', [
         'search-form',
         'comment-form',
         'comment-list',
@@ -13,29 +17,44 @@ function rhuarcs_setup() {
         'caption',
         'style',
         'script'
-    ));
-
-    register_nav_menus(array(
+    ]);
+    
+    // Register nav menus
+    register_nav_menus([
         'primary' => __('Primary Menu', 'rhuarcs'),
-        'footer' => __('Footer Menu', 'rhuarcs'),
-    ));
+        'footer' => __('Footer Menu', 'rhuarcs')
+    ]);
 }
-add_action('after_setup_theme', 'rhuarcs_setup');
+add_action('after_setup_theme', 'rhuarcs_theme_setup');
 
-// Enqueue Scripts and Styles
-function rhuarcs_scripts() {
-    wp_enqueue_style('rhuarcs-styles', get_stylesheet_uri(), array(), wp_get_theme()->get('Version'));
-    wp_enqueue_style('rhuarcs-main', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.0');
-    wp_enqueue_script('rhuarcs-scripts', get_template_directory_uri() . '/assets/js/scripts.js', array(), '1.0.0', true);
+// Enqueue scripts and styles
+function rhuarcs_enqueue_scripts() {
+    // Enqueue main stylesheet
+    wp_enqueue_style('rhuarcs-style', get_stylesheet_uri(), [], wp_get_theme()->get('Version'));
+    wp_enqueue_style('rhuarcs-main', get_template_directory_uri() . '/assets/css/main.css', [], wp_get_theme()->get('Version'));
+    
+    // Enqueue scripts
+    wp_enqueue_script('rhuarcs-scripts', get_template_directory_uri() . '/assets/js/scripts.js', ['jquery'], wp_get_theme()->get('Version'), true);
+    
+    // Localize script for AJAX
+    wp_localize_script('rhuarcs-scripts', 'rhuarcsData', [
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('rhuarcs_nonce')
+    ]);
 }
-add_action('wp_enqueue_scripts', 'rhuarcs_scripts');
+add_action('wp_enqueue_scripts', 'rhuarcs_enqueue_scripts');
 
-// Include required files
-require_once get_template_directory() . '/inc/custom-post-types.php';
-require_once get_template_directory() . '/inc/helpers.php';
-require_once get_template_directory() . '/inc/admin/product-management.php';
-
-// Admin page setup
-if (is_admin()) {
-    require_once get_template_directory() . '/inc/admin/admin-page.php';
+// Admin scripts
+function rhuarcs_admin_scripts($hook) {
+    if ('toplevel_page_rhuarcs-products' !== $hook) return;
+    
+    wp_enqueue_script('react');
+    wp_enqueue_script('react-dom');
+    wp_enqueue_script('rhuarcs-admin', get_template_directory_uri() . '/assets/js/admin/build/index.js', ['react', 'react-dom'], wp_get_theme()->get('Version'), true);
+    
+    wp_localize_script('rhuarcs-admin', 'rhuarcsAdmin', [
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('rhuarcs_admin_nonce')
+    ]);
 }
+add_action('admin_enqueue_scripts', 'rhuarcs_admin_scripts');
